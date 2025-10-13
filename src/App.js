@@ -1,24 +1,13 @@
 import logo from './logo.svg';
 import './App.css';
+import AlumniList from "./components/AlumniList";
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+      <div>
+        <h1 style={{ textAlign: 'center', color: '#333' }}>大数据与软件学院就业工作室</h1>
+        <AlumniList />
+      </div>
   );
 }
 
