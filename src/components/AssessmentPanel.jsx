@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import RadarChart from './RadarChart'; // 导入雷达图组件
 
-// 假设后端基础 API 版本为 v1
+
 const BASE_API = '/api/students';
 
 // 样式常量
@@ -212,26 +212,24 @@ const AssessmentPanel = () => {
                     <h4 style={{ color: colors.accent, borderBottom: `1px solid ${colors.border}` }}>
                         学生画像摘要 ({profile.info?.name} - {profile.info?.major})
                     </h4>
-
                     <div style={{ height: '300px', width: '100%', margin: '15px 0' }}>
                         <RadarChart chartData={radarData} />
                     </div>
-
                     <p><strong>主修GPA:</strong> <span style={{ color: colors.accent }}>{assessment.gpaMajor || 'N/A'}</span></p>
                     <p><strong>DISC倾向:</strong> {assessment.discType || 'N/A'}</p>
-
+                    {/*不需要再在雷达图下展示学生的详细得分数据
                     <h5 style={{ color: colors.header, marginTop: '15px' }}>各项能力得分 (5分制)</h5>
                     <ul style={{ listStyleType: 'none', padding: 0, display: 'flex', flexWrap: 'wrap', gap: '15px' }}>
                         {radarData.indicator.map((item, index) => (
                             <li key={item.name} style={{ width: '45%', border: `1px dashed ${colors.border}`, padding: '8px', borderRadius: '4px', fontSize: '0.85vw' }}>
                                 <span>{item.name}: </span>
                                 <span style={{ color: colors.accent, fontWeight: 'bold' }}>
-                                    {/* **[修正 3]** 使用正确的逻辑或操作符 || */}
+                                     **[修正 3]** 使用正确的逻辑或操作符 ||
                                     {radarData.value[index] || 'N/A'}
                                 </span>
                             </li>
                         ))}
-                    </ul>
+                    </ul>*/}
                 </div>
             );
         }
@@ -241,8 +239,6 @@ const AssessmentPanel = () => {
 
     return (
         <div style={styles.panel}>
-            <h3 style={styles.panelTitle}>【左栏-上】学生筛选与能力评测 (2:1)</h3>
-
             <div style={styles.selectorGroup}>
                 <label style={{ minWidth: '80px', fontSize: '0.9vw' }}>选择学生:</label>
                 <select
