@@ -1,5 +1,6 @@
 import React from 'react';
-// 假设您已经有一个 AlumniList 组件用于获取和展示数据，这里将其内容替换为结构占位符
+import AssessmentPanel from './AssessmentPanel';
+
 
 // 定义全局样式和颜色变量，便于后续维护
 const colors = {
@@ -130,6 +131,7 @@ const DataDashboard = () => {
                     <div style={styles.sidePanel}>
                         <h3 style={styles.panelTitle}>【左栏-上】学生筛选与能力评测 (2:1)</h3>
                         <p>功能区: 用户评测输入、目标岗位选择、能力雷达图展示 [4, 5, 2]</p>
+                        <AssessmentPanel />
                     </div>
 
                     {/* 左栏 - 下 (1/2) */}
