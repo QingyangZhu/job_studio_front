@@ -1,5 +1,6 @@
 import React from 'react';
 import AssessmentPanel from './AssessmentPanel';
+import ChatAssistant from './ChatAssistant';
 
 
 // 定义全局样式和颜色变量，便于后续维护
@@ -136,8 +137,9 @@ const DataDashboard = () => {
 
                     {/* 左栏 - 下 (1/2) */}
                     <div style={styles.sidePanel}>
-                        <h3 style={styles.panelTitle}>【左栏-下】高光成就墙 (2:1)</h3>
-                        <p>数据展示: 国家级/省级竞赛获奖、优秀校友列表 [6, 7, 8]</p>
+                        <h3 style={styles.panelTitle}>【左栏-下】AI助手 (2:1)</h3>
+                        <p>结合页面上下文内容进行辅助分析（待实现） [6, 7, 8]</p>
+                        <ChatAssistant />
                     </div>
                 </div>
 

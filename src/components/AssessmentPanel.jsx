@@ -81,16 +81,23 @@ const MAX_SCORE = 5;
 // **[修正 1]** 补全指标映射表 (这是核心)
 // key: 对应后端 assessment 对象中的字段名
 // label: 显示在雷达图上的名称
+// **[修正方案]** 修正指标映射表，使其与后端实体类完全对应
+// key: 必须和 AssessmentResult.java 中的字段名完全一致
+// label: 显示在雷达图上的中文名称
+
+//这里为了雷达图的完整展示直接将系统里原有的一些数据拿来展示，但是后期应该需要在收集到学生的诸多信息后进行提取计算再得到某些能力指标的值
+//比如通过对他某些科目的成绩和项目经历以及比赛经历来看他的编程能力等
 const INDICATORS_MAP = [
-    { label: '编程与算法', key: 'programmingAbility' },
-    { label: '软件工程实践', key: 'engineeringPractice' },
-    { label: '专业GPA', key: 'gpaMajor' },
-    { label: '解决问题能力', key: 'problemSolving' },
-    { label: '学习与适应性', key: 'learningAdaptability' },
-    { label: '沟通与协作', key: 'communicationCooperation' },
-    { label: '项目管理', key: 'projectManagement' },
-    { label: '创新思维', key: 'innovativeThinking' }
+    { label: 'Python能力', key: 'pythonScore' },
+    { label: 'Java能力', key: 'javaScore' },
+    { label: 'SQL数据库', key: 'sqlScore' },
+    { label: '大数据框架', key: 'bigdataFrameworksScore' },
+    { label: '解决问题能力', key: 'problemSolvingScore' },
+    { label: '团队协作能力', key: 'teamworkScore' },
+    { label: '沟通能力', key: 'communicationScore' },
+    { label: '抗压与适应性', key: 'resilienceScore' } // resilience_score 对应抗压/韧性
 ];
+
 
 /**
  * 将后端返回的 AssessmentResult 数据转换为 ECharts 雷达图格式
