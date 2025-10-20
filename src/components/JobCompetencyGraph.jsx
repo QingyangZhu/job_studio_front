@@ -12,7 +12,8 @@ const colors = {
     recommended: '#f1c40f',  // 黄色 (推荐路径高亮)
     jobRole: '#3498db',      // 蓝色 (岗位中心)
     link: 'rgba(255, 255, 255, 0.3)', // 默认连接线
-    recommendedLink: '#f1c40f'
+    recommendedLink: '#f1c40f',
+    danger: '#e74c3c'       // 错误提示颜色
 };
 
 /**
@@ -21,14 +22,12 @@ const colors = {
 const JobCompetencyGraph = ({ jobRole, studentId }) => {
     const chartRef = useRef(null);
     const chartInstance = useRef(null);
-    // [修正 1] 使用完整的 useState 声明
     const [graphData, setGraphData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     // 1. 数据获取函数
     const fetchGraphData = useCallback(async () => {
-        // [修正 2] 使用正确的逻辑或操作符 ||
         const currentJobRole = jobRole || "前端开发工程师";
         const currentStudentId = studentId || 22010101;
 
@@ -42,83 +41,104 @@ const JobCompetencyGraph = ({ jobRole, studentId }) => {
             });
             setGraphData(response.data);
         } catch (err) {
-            setError(`无法加载岗位图谱数据。请检查后端 /api/v1/jobs/graph 接口。`);
+            setError(`无法加载岗位图谱数据。请检查后端 /api/jobs/graph 接口。`);
             console.error("KG Fetch Error:", err);
         } finally {
             setLoading(false);
         }
-        // [修正 3] 添加正确的 useCallback 依赖项
     }, [jobRole, studentId]);
 
     useEffect(() => {
         fetchGraphData();
-        // [修正 3] 添加正确的 useEffect 依赖项
     }, [fetchGraphData]);
 
 
     // 2. ECharts 渲染逻辑
     useEffect(() => {
         if (!chartRef.current || !graphData) {
-            // 如果 graphData 为空，也确保清空画布
             if (chartInstance.current) {
                 chartInstance.current.clear();
             }
             return;
         }
 
-        // 确保只初始化一次 ECharts 实例
         chartInstance.current = chartInstance.current || echarts.init(chartRef.current, 'dark');
         const instance = chartInstance.current;
 
-        const formattedNodes = graphData.nodes.map(node => ({
-            ...node,
-            itemStyle: {
-                color: node.id === '101' ? colors.jobRole :
-                    node.isUserAcquired ? colors.acquired :
-                        node.isGap ? colors.gap :
-                            colors.header,
-            },
-            fixed: node.nodeType === 'JobRole',
-            x: node.nodeType === 'JobRole' ? instance.getWidth() / 2 : null,
-            y: node.nodeType === 'JobRole' ? instance.getHeight() / 2 : null,
-        }));
+        // 【核心修正 ①】: 创建从后端 category 字符串到前端显示名称的映射
+        const categoryNameMapping = {
+            'JobRole': '岗位角色',
+            'Threshold': '门槛技能',
+            'Differentiating': '核心技能',
+            'SoftSkill': '软技能',
+            'Book/Doc': '学习资源',
+            'HardSkill': '专业指标'
+        };
+
+        // 【核心修正 ②】: 创建从前端显示名称到其在 categories 数组中索引的映射
+        const categoryIndexMap = new Map(
+            graphData.categories.map((c, i) => [c.name, i])
+        );
+
+        // 【核心修正 ③】: 在格式化节点时，将字符串 category 转换为数字索引
+        const formattedNodes = graphData.nodes.map(node => {
+            const mappedCategoryName = categoryNameMapping[node.category] || node.category;
+            const categoryIndex = categoryIndexMap.get(mappedCategoryName);
+
+            return {
+                ...node,
+                category: categoryIndex, // 使用数字索引代替字符串
+                itemStyle: {
+                    color: node.category === 'JobRole' ? colors.jobRole :
+                        node.isUserAcquired ? colors.acquired :
+                            node.isGap ? colors.gap :
+                                colors.header,
+                },
+                fixed: node.category === 'JobRole', // 使用 category 字段判断
+                x: node.category === 'JobRole' ? instance.getWidth() / 2 : null,
+                y: node.category === 'JobRole' ? instance.getHeight() / 2 : null,
+            };
+        });
 
         const formattedLinks = graphData.links.map(link => ({
             ...link,
             lineStyle: {
-                width: link.isRecommendedPath ? 4 : 1,
+                width: link.isRecommendedPath ? 4 : 1.5,
                 color: link.isRecommendedPath ? colors.recommendedLink : colors.link,
                 type: link.isRecommendedPath ? 'solid' : 'dotted',
-                shadowBlur: link.isRecommendedPath ? 10 : 0,
-                shadowColor: link.isRecommendedPath ? colors.recommendedLink : 'transparent'
+                curveness: 0.05 // 给线条一点弧度，避免重叠
             },
             symbol: ['none', 'arrow'],
-            // [修正 4] 补全三元运算符
-            symbolSize: link.isRecommendedPath ? 12 : 8,
+            symbolSize: link.isRecommendedPath ? 10 : 8,
             label: {
                 show: link.isRecommendedPath,
-                formatter: `{b}\n(成本: ${link.weight})`,
-                color: colors.recommendedLink
+                formatter: `{b}`,
+                color: colors.recommendedLink,
+                fontSize: 10,
+                backgroundColor: 'rgba(0,0,0,0.5)',
+                padding: [2, 4],
+                borderRadius: 2
             }
         }));
 
         const option = {
-            backgroundColor: 'transparent', // 确保背景透明
+            backgroundColor: 'transparent',
             title: {
                 text: `${graphData.jobTitle} 岗位能力图谱`,
                 subtext: `学生ID: ${studentId || 'N/A'}`,
                 left: 'center',
                 top: 10,
-                textStyle: { color: colors.text, fontSize: 18 }
+                textStyle: { color: colors.text, fontSize: 18, fontWeight: 'bold' }
             },
             tooltip: {
                 formatter: function (params) {
                     if (params.dataType === 'node') {
                         const acquiredStatus = params.data.isUserAcquired ? '✅ 已掌握' : params.data.isGap ? '❌ 缺失 (待学习)' : '要求';
-                        return `<strong>${params.name}</strong><br/>类型: ${params.data.category}<br/>状态: ${acquiredStatus}`;
+                        const categoryName = graphData.categories[params.data.category]?.name || '未知分类';
+                        return `<strong>${params.name}</strong><br/>类型: ${categoryName}<br/>状态: ${acquiredStatus}`;
                     }
                     if (params.dataType === 'edge') {
-                        return `${params.name}<br/>关系: <strong>${params.data.name}</strong><br/>学习成本: ${params.data.weight}`;
+                        return `关系: <strong>${params.data.name}</strong><br/>学习成本: ${params.data.weight}`;
                     }
                     return params.name;
                 }
@@ -134,25 +154,25 @@ const JobCompetencyGraph = ({ jobRole, studentId }) => {
                 roam: true,
                 draggable: true,
                 force: {
-                    repulsion: 150,
-                    edgeLength: 120,
+                    repulsion: 200,
+                    edgeLength: [100, 150],
                     gravity: 0.1,
                     layoutAnimation: true
                 },
                 data: formattedNodes,
                 links: formattedLinks,
-                categories: graphData.categories,
+                categories: graphData.categories, // 这里保持不变，作为图例的定义
                 label: {
                     show: true,
                     position: 'right',
                     formatter: '{b}',
                     color: colors.text,
-                    fontSize: 10
+                    fontSize: 11
                 },
                 emphasis: {
                     focus: 'adjacency',
-                    label: {
-                        show: true
+                    lineStyle: {
+                        width: 4
                     }
                 }
             }]
@@ -165,10 +185,7 @@ const JobCompetencyGraph = ({ jobRole, studentId }) => {
 
         return () => {
             window.removeEventListener('resize', resizeChart);
-            // 不在数据变化时销毁实例，只在组件卸载时销毁
-            // instance.dispose();
         };
-        // [修正 3] 添加正确的 useEffect 依赖项
     }, [graphData, studentId]);
 
     // 组件卸载时清理 ECharts 实例
@@ -181,7 +198,6 @@ const JobCompetencyGraph = ({ jobRole, studentId }) => {
         }
     }, []);
 
-
     const loadingStyle = {
         color: colors.accent,
         textAlign: 'center',
@@ -189,7 +205,8 @@ const JobCompetencyGraph = ({ jobRole, studentId }) => {
         height: '100%',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
+        fontSize: '1.2vw'
     };
 
     if (error) return <div style={{...loadingStyle, color: colors.danger}}>{error}</div>;
