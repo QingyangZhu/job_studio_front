@@ -2,6 +2,7 @@ import React from 'react';
 import AssessmentPanel from './AssessmentPanel';
 import ChatAssistant from './ChatAssistant';
 import JobCompetencyGraph from './JobCompetencyGraph'
+import AlumniGrowthTimeline from './AlumniGrowthTimeline';
 
 // 定义全局样式和颜色变量，便于后续维护
 const colors = {
@@ -161,7 +162,7 @@ const DataDashboard = () => {
                     {/* 右栏 - 上 */}
                     <div style={styles.sidePanel}>
                         <h3 style={styles.panelTitle}>校友生涯成长曲线</h3>
-                        <p>数据展示: 选定校友的 Major GPA 曲线、重要事件时间轴</p>
+                        <AlumniGrowthTimeline/>
                     </div>
 
                     {/* 右栏 - 下 */}
