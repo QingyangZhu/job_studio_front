@@ -3,6 +3,7 @@ import AssessmentPanel from './AssessmentPanel';
 import ChatAssistant from './ChatAssistant';
 import JobCompetencyGraph from './JobCompetencyGraph'
 import AlumniGrowthTimeline from './AlumniGrowthTimeline';
+import JobDistributionMap from './JobDistributionMap';
 
 // 定义全局样式和颜色变量，便于后续维护
 const colors = {
@@ -169,6 +170,7 @@ const DataDashboard = () => {
                     <div style={styles.sidePanel}>
                         <h3 style={styles.panelTitle}>就业地域与行业分布</h3>
                         <p>数据展示: 城市地图分布（地理视图）、行业占比饼图</p>
+                        <JobDistributionMap/>
                     </div>
                 </div>
 
