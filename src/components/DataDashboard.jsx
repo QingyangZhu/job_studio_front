@@ -90,7 +90,7 @@ const styles = {
 
     // 中间栏的 上下区域 (高度 3:1 划分)
     centerTopPanel: {
-        flex: 3,
+        flex: 7,
         backgroundColor: colors.panelBg,
         borderRadius: '8px',
         border: `1px solid ${colors.border}`,
@@ -98,7 +98,7 @@ const styles = {
         boxShadow: '0 0 15px rgba(0, 197, 199, 0.3)'
     },
     centerBottomPanel: {
-        flex: 1,
+        flex: 4,
         backgroundColor: colors.panelBg,
         borderRadius: '8px',
         border: `1px solid ${colors.border}`,

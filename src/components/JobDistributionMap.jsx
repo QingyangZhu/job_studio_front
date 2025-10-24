@@ -8,6 +8,10 @@ import * as d3 from 'd3';
 import chinaMapGeoJson from '../assets/geo_maps/china.json';
 echarts.registerMap('china', chinaMapGeoJson);
 
+// 2. 从外部工具文件导入中文-拼音映射表
+import { PROVINCE_PINYIN_MAP } from '../utils/mapUtils';
+
+
 // --- 样式与常量定义 ---
 const COLORS = {
     background: 'transparent',
@@ -56,6 +60,9 @@ const styles = {
         transition: 'background-color 0.3s'
     }
 };
+
+// 定义一个阈值，决定何时使用散点图 vs 饼图
+const SCATTER_PIE_THRESHOLD = 5; // 当总人数 > 5 时，才使用饼图
 
 const JobDistributionMap = () => {
     const chartRef = useRef(null);
@@ -112,15 +119,83 @@ const JobDistributionMap = () => {
 
         const validDataToRender = dataToRender.filter(item => item && typeof item.coord === 'string' && item.coord.includes(','));
 
-        const radiusScale = d3.scaleSqrt()
-            .domain([1, d3.max(validDataToRender, d => d.total) || 1])
-            .range([8, 22]);
+        const scatterData = [];
+        const pieData = [];
+        validDataToRender.forEach(item => {
+            if (item.total <= SCATTER_PIE_THRESHOLD) {
+                scatterData.push(item);
+            } else {
+                pieData.push(item);
+            }
+        });
 
-        const pieSeries = validDataToRender.map((item) => {
+        const scatterSeries = {
+            type: 'scatter',
+            coordinateSystem: 'geo',
+            geoIndex: 0,
+            zlevel: 3,
+            symbol: 'circle',
+            data: scatterData.map(item => ({
+                name: item.name,
+                value: [...(item.coord || '0,0').split(',').map(Number), item.total],
+                jobDetails: item.data
+            })),
+            symbolSize: (value) => Math.sqrt(value[2]) * 10 + 5,
+            itemStyle: {
+                color: COLORS.mapBorder,
+                shadowBlur: 10,
+                shadowColor: COLORS.mapBorder,
+            },
+            emphasis: {
+                scale: 1.5,
+                itemStyle: {
+                    borderColor: '#fff',
+                    borderWidth: 1,
+                }
+            },
+            tooltip: {
+                backgroundColor: 'rgba(20, 29, 51, 0.9)',
+                borderColor: COLORS.mapBorder,
+                borderWidth: 1,
+                textStyle: { color: '#fff' },
+                formatter: (params) => {
+                    const { name, value, data } = params;
+                    const total = value[2];
+                    const jobDetailsHtml = (data.jobDetails || [])
+                        .map(job => `<li>${job.name}: ${job.value}人</li>`)
+                        .join('');
+                    return `
+                        <div style="font-size: 14px; font-weight: bold;">${name} (${total}人)</div>
+                        <ul style="padding-left: 20px; margin: 5px 0 0;">${jobDetailsHtml}</ul>
+                    `;
+                }
+            }
+        };
+
+        const radiusScale = d3.scaleSqrt().domain([SCATTER_PIE_THRESHOLD + 1, d3.max(pieData, d => d.total) || SCATTER_PIE_THRESHOLD + 1]).range([20, 40]);
+        const pieSeries = pieData.map((item) => {
             const coordArray = (item.coord || '0,0').split(',').map(Number);
             return {
-                type: 'pie', id: item.name, name: item.name, seriesName: item.name, coordinateSystem: 'geo', geoIndex: 0, zlevel: 2, center: coordArray, data: item.data || [], radius: `${radiusScale(item.total)}px`,
-                tooltip: { formatter: (params) => { const cityTotal = item.total || 0; const jobName = params.name; const jobValue = params.value; const percentage = cityTotal > 0 ? (jobValue / cityTotal * 100).toFixed(1) : 0; return `<strong>${item.name} (${cityTotal}人)</strong><br/>${jobName}: ${jobValue}人 (${percentage}%)`; } },
+                type: 'pie', id: item.name, name: item.name, seriesName: item.name, coordinateSystem: 'geo', geoIndex: 0, zlevel: 2, center: coordArray, data: item.data || [],
+                radius: `${radiusScale(item.total)}px`,
+                emphasis: {
+                    focus: 'series',
+                    scale: 1.2,
+                    label: {
+                        show: true,
+                        formatter: '{b}\n{d}%',
+                        fontWeight: 'bold'
+                    }
+                },
+                tooltip: {
+                    formatter: (params) => {
+                        const cityTotal = item.total || 0;
+                        const jobName = params.name;
+                        const jobValue = params.value;
+                        const percentage = cityTotal > 0 ? (jobValue / cityTotal * 100).toFixed(1) : 0;
+                        return `<strong>${item.name} (${cityTotal}人)</strong><br/>${jobName}: ${jobValue}人 (${percentage}%)`;
+                    }
+                },
                 label: { show: false }, labelLine: { show: false },
             };
         });
@@ -130,62 +205,52 @@ const JobDistributionMap = () => {
             tooltip: { trigger: 'item' },
             color: COLORS.pieSlice,
             geo: { map: currentMapName, roam: true, selectedMode: 'single', itemStyle: { areaColor: COLORS.mapArea, borderColor: COLORS.mapBorder }, emphasis: { itemStyle: { areaColor: '#2a333d' }, label: { color: COLORS.text }}, label: { show: false } },
-            series: pieSeries
+            series: [scatterSeries, ...pieSeries]
         };
 
         instance.setOption(option, true);
 
-        // --- 【核心修改】重构点击事件，实现动态加载 ---
         instance.off('click');
         instance.on('click', async (params) => {
             if (currentLevel !== 'province') return;
-
             let provinceName = '';
-            if (params.seriesType === 'map') {
+            if (params.seriesType === 'map' || params.seriesType === 'pie' || params.seriesType === 'scatter') {
                 provinceName = params.name;
-            } else if (params.seriesType === 'pie') {
-                provinceName = params.seriesName;
             }
 
             if (!provinceName) return;
 
-            // 1. 检查地图是否已经被注册过，避免重复加载
+            const pinyinFilename = PROVINCE_PINYIN_MAP[provinceName];
+            if (!pinyinFilename) {
+                console.warn(`在 PROVINCE_PINYIN_MAP 中找不到 "${provinceName}" 的映射。`);
+                alert(`暂无 "${provinceName}" 的详细地图数据。`);
+                return;
+            }
+
             if (echarts.getMap(provinceName)) {
                 setCurrentLevel('city');
                 setCurrentMapName(provinceName);
                 return;
             }
 
-            // 2. 动态导入省份的 GeoJSON 文件
             try {
-                instance.showLoading(); // 显示加载动画
-
-                // 关键！动态构建文件路径。
-                // 前提：省份json文件名必须与省份名完全一致（如 "广东省.json"）。
-                const mapJson = await import(
-                    /* webpackChunkName: "province-map-[request]" */
-                    `../assets/geo_maps/${provinceName}.json`
-                    );
-
-                // 3. 注册新加载的地图
+                instance.showLoading();
+                const mapJson = await import(`../assets/geo_maps/${pinyinFilename}.json`);
                 echarts.registerMap(provinceName, mapJson.default);
-
-                // 4. 切换到省份地图
                 setCurrentLevel('city');
                 setCurrentMapName(provinceName);
-
             } catch (e) {
-                console.error(`加载地图 "${provinceName}" 失败: `, e);
+                console.error(`加载地图文件 "${pinyinFilename}.json" 失败: `, e);
                 alert(`暂无 "${provinceName}" 的详细地图数据。`);
             } finally {
-                instance.hideLoading(); // 隐藏加载动画
+                instance.hideLoading();
             }
         });
 
         const resizeChart = () => instance.resize();
         window.addEventListener('resize', resizeChart);
         return () => window.removeEventListener('resize', resizeChart);
-    }, [provinceData, cityDetailsMap, currentMapName, currentLevel, loading, handleZoomOut]); // 依赖项中加入 handleZoomOut
+    }, [provinceData, cityDetailsMap, currentMapName, currentLevel, loading, handleZoomOut]);
 
     useEffect(() => {
         return () => {
