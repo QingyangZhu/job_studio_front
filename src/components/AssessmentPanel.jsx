@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import RadarChart from './RadarChart'; // 确保你已创建此组件
+import RadarChart from './RadarChart';
+import useAppStore from '../store/appStore';
 
 const BASE_API = '/api/students';
 

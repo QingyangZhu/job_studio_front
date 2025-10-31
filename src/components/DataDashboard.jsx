@@ -4,6 +4,7 @@ import ChatAssistant from './ChatAssistant';
 import JobCompetencyGraph from './JobCompetencyGraph'
 import AlumniGrowthTimeline from './AlumniGrowthTimeline';
 import JobDistributionMap from './JobDistributionMap';
+import useAppStore from '../store/appStore';
 
 // 定义全局样式和颜色变量，便于后续维护
 const colors = {
@@ -115,6 +116,26 @@ const styles = {
     }
 };
 
+const GapAnalysisPanel = () => {
+    // 直接在组件内部从 store 获取状态
+    const { selectedStudentId, selectedAlumniId } = useAppStore();
+
+    let content = '请先在左侧选择学生，并在右侧选择学长学姐以进行能力差距分析。';
+
+    if (selectedStudentId && selectedAlumniId) {
+        content = `正在分析学生 ${selectedStudentId} 与目标岗位的能力差距...`;
+    } else if (selectedStudentId) {
+        content = '请在右侧选择一位学长学姐作为目标。';
+    } else if (selectedAlumniId) {
+        content = '请在左侧选择一名学生进行分析。';
+    }
+
+    return (
+        <div>
+            <p>{content}</p>
+        </div>
+    );
+};
 
 const DataDashboard = () => {
     return (
