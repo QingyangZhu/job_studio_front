@@ -1,20 +1,21 @@
 import React, { useEffect } from 'react';
-import DataDashboard from './components/DataDashboard';
+import AppRouter from './router/AppRouter';
 import useAppStore from './store/appStore';
-import './App.css'; // 确保 App.css 被导入
+import './App.css';
 
 function App() {
-    // 获取 actions
+    // 依然保留全局数据预加载逻辑
     const fetchStudentList = useAppStore((state) => state.fetchStudentList);
     const fetchAlumniList = useAppStore((state) => state.fetchAlumniList);
 
-    // App 加载时，全局获取一次列表数据
     useEffect(() => {
         fetchStudentList();
         fetchAlumniList();
     }, [fetchStudentList, fetchAlumniList]);
 
-    return <DataDashboard />;
+    return (
+        <AppRouter />
+    );
 }
 
 export default App;
