@@ -1,41 +1,31 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-
-// 使用 Vite 代理配置的路径，转发到 Spring Boot 后端的 /alumni/all
-const API_URL = '/api/alumni/all';
+import React, { useEffect } from 'react';
+import useAppStore from '../store/appStore'; // 1. 引入全局 Store
 
 const AlumniList = () => {
-    // 【已修正】正确使用 useState 钩子
-    const [alumniData, setAlumniData] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    // 2. 从 Store 获取数据和操作方法
+    const {
+        alumniList,
+        fetchAlumniList,
+        selectAlumni,
+        selectedAlumniId,
+        loading,
+        error
+    } = useAppStore();
 
+    // 3. 初始化加载 (如果 Store 里还没数据)
     useEffect(() => {
-        const fetchAlumni = async () => {
-            try {
-                // Axios 发送 GET 请求到代理路径 /api/alumni/all
-                const response = await axios.get(API_URL);
+        if (alumniList.length === 0) {
+            fetchAlumniList();
+        }
+    }, [fetchAlumniList, alumniList.length]);
 
-                if (Array.isArray(response.data)) {
-                    setAlumniData(response.data);
-                } else {
-                    // 如果后端返回的不是数组，设置错误信息
-                    setError("后端数据结构不符合预期，返回的不是数组。");
-                }
+    // 4. 处理点击交互：更新全局选中 ID
+    const handleSelect = (id) => {
+        selectAlumni(id);
+    };
 
-            } catch (err) {
-                // 捕获网络错误、超时等信息
-                console.error("数据获取失败:", err);
-                setError(`连接后端失败。错误信息: ${err.message}。请确保后端服务(http://localhost:8080)正在运行。`);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchAlumni();
-    }, []); // 依赖项数组为空，确保只在组件挂载时运行一次
-
-    if (loading) {
+    // 渲染加载状态
+    if (loading.alumniList && alumniList.length === 0) {
         return <div style={styles.message}>数据加载中，请稍候...</div>;
     }
 
@@ -43,29 +33,46 @@ const AlumniList = () => {
         return <div style={{...styles.message, color: 'red' }}>错误: {error}</div>;
     }
 
-    if (alumniData.length === 0) {
-        return <div style={styles.message}>未找到校友数据。请检查后端数据库或接口。</div>;
+    if (!alumniList || alumniList.length === 0) {
+        return <div style={styles.message}>未找到校友数据。</div>;
     }
 
     return (
         <div style={styles.container}>
-            <h2 style={styles.header}>后端数据连接成功 ({alumniData.length} 条记录)</h2>
-            <p style={styles.subtitle}>正在展示从 Spring Boot 接口获取的前辈基本信息：</p>
+            <h2 style={styles.header}>校友名录 ({alumniList.length} 人)</h2>
+            <p style={styles.subtitle}>点击列表项可将该校友设为“全局分析对象”</p>
 
             <ul style={styles.list}>
-                {alumniData.map((alumnus) => (
-                    // 必须使用唯一的 key 属性 [1]
-                    <li key={alumnus.alumniId} style={styles.listItem}>
-                        <div style={styles.itemDetail}>
-                            <strong>ID:</strong> {alumnus.alumniId} |
-                            <strong>姓名:</strong> {alumnus.name}
-                        </div>
-                        <div style={styles.itemDetail}>
-                            <strong>专业:</strong> {alumnus.major} |
-                            <strong>毕业年份:</strong> {alumnus.graduationYear}
-                        </div>
-                    </li>
-                ))}
+                {alumniList.map((alumnus) => {
+                    // 判断是否被选中
+                    const isSelected = String(alumnus.alumniId) === String(selectedAlumniId);
+
+                    return (
+                        <li
+                            key={alumnus.alumniId}
+                            style={{
+                                ...styles.listItem,
+                                // 选中时的高亮样式
+                                borderColor: isSelected ? '#00c5c7' : '#ddd',
+                                backgroundColor: isSelected ? '#f0f9ff' : '#fff',
+                                transform: isSelected ? 'scale(1.02)' : 'none',
+                                boxShadow: isSelected ? '0 0 10px rgba(0, 197, 199, 0.4)' : 'none'
+                            }}
+                            onClick={() => handleSelect(alumnus.alumniId)}
+                        >
+                            <div style={styles.itemDetail}>
+                                <strong>姓名:</strong> {alumnus.name}
+                                {isSelected && <span style={styles.badge}>当前选中</span>}
+                            </div>
+                            <div style={styles.itemDetail}>
+                                <strong>岗位:</strong> {alumnus.jobTitle || '未知'} <br/>
+                                <span style={{fontSize: '0.85em', color: '#666'}}>
+                                    {alumnus.graduationYear}届 | {alumnus.major}
+                                </span>
+                            </div>
+                        </li>
+                    );
+                })}
             </ul>
         </div>
     );
@@ -74,54 +81,64 @@ const AlumniList = () => {
 // 样式定义
 const styles = {
     container: {
-        padding: '30px',
+        padding: '20px',
         fontFamily: 'Microsoft YaHei, Arial, sans-serif',
-        maxWidth: '900px',
-        margin: '0 auto',
-        backgroundColor: '#f8f9fa',
-        borderRadius: '10px',
-        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+        // 适配大屏风格，或者保持原来的亮色风格皆可，这里做了一点微调使其更紧凑
+        backgroundColor: '#fff',
+        borderRadius: '8px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        height: '100%',
+        overflowY: 'auto' // 允许列表滚动
     },
     header: {
         color: '#0056b3',
-        borderBottom: '2px solid #eee',
+        borderBottom: '1px solid #eee',
         paddingBottom: '10px',
-        textAlign: 'center'
+        textAlign: 'center',
+        margin: '0 0 10px 0',
+        fontSize: '1.2rem'
     },
     subtitle: {
-        color: '#555',
-        marginBottom: '20px',
+        color: '#888',
+        marginBottom: '15px',
         textAlign: 'center',
-        fontSize: '1.1rem'
+        fontSize: '0.9rem'
     },
     list: {
         listStyleType: 'none',
-        padding: 0
+        padding: 0,
+        margin: 0
     },
     listItem: {
         border: '1px solid #ddd',
-        borderRadius: '8px',
-        padding: '15px',
-        marginBottom: '10px',
+        borderRadius: '6px',
+        padding: '12px',
+        marginBottom: '8px',
         backgroundColor: '#fff',
         display: 'flex',
         justifyContent: 'space-between',
-        transition: 'transform 0.2s, box-shadow 0.2s',
-        '&:hover': {
-            transform: 'translateY(-3px)',
-            boxShadow: '0 5px 15px rgba(0,0,0,0.1)'
-        }
+        alignItems: 'center',
+        cursor: 'pointer', // 鼠标变手型
+        transition: 'all 0.2s',
     },
     itemDetail: {
         flex: 1,
-        minWidth: '45%',
-        lineHeight: '1.6'
+        lineHeight: '1.4',
+        color: '#333'
+    },
+    badge: {
+        display: 'inline-block',
+        marginLeft: '8px',
+        padding: '2px 6px',
+        backgroundColor: '#00c5c7',
+        color: 'white',
+        borderRadius: '4px',
+        fontSize: '0.7rem'
     },
     message: {
         textAlign: 'center',
-        padding: '40px',
-        color: '#888',
-        fontSize: '1.2rem'
+        padding: '20px',
+        color: '#888'
     }
 };
 

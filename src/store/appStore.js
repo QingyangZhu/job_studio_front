@@ -2,12 +2,8 @@ import { create } from 'zustand';
 import axios from 'axios';
 
 // 辅助函数：处理 API 响应
-// 假设你的后端统一返回 { code: 200, msg: "...", data: ... } 格式
-// 如果不是，请直接使用 response.data
 const handleResponse = (response) => {
     if (response.data) {
-        // 检查是否有 data 字段，如果有，优先返回 data
-        // 这能兼容 { code: 200, data: [...] } 和 [...] 两种格式
         return response.data.data || response.data;
     }
     return response.data;
@@ -22,14 +18,14 @@ const useAppStore = create((set, get) => ({
     selectedJobRole: null, // 选中学长的岗位名称
 
     // 2. 列表数据
-    studentList: [], // (来自 /api/students/list)
-    alumniList: [],  // (来自 /api/alumni/all)
+    studentList: [],
+    alumniList: [],
 
     // 3. 联动数据
-    studentProfile: null, // (来自 /api/students/{id}/profile)
-    graphData: null,      // (来自 /api/jobs/graph)
-    mapData: null,        // (来自 /api/jobs/distribution)
-    chatMessages: [],     // (用于 /api/chat/ask)
+    studentProfile: null,
+    graphData: null,
+    mapData: null,
+    chatMessages: [],
 
     // 4. 加载和错误状态
     loading: {
@@ -44,7 +40,7 @@ const useAppStore = create((set, get) => ({
 
     // ================== 操作 (Actions) ==================
 
-    // --- 1. 初始化加载 (获取列表) ---
+    // --- 1. 初始化加载 ---
     fetchStudentList: async () => {
         set(state => ({ loading: { ...state.loading, studentList: true } }));
         try {
@@ -87,18 +83,15 @@ const useAppStore = create((set, get) => ({
         }));
 
         try {
-            // 步骤 1: 检查状态
             const statusResponse = await axios.get(`/api/students/${studentId}/status`);
             const status = handleResponse(statusResponse);
 
             if (status.isComplete) {
-                // 步骤 2: 获取完整画像
                 const profileResponse = await axios.get(`/api/students/${studentId}/profile`);
                 set({ studentProfile: handleResponse(profileResponse) });
-                // 步骤 3: 尝试触发图谱
+                // 自动触发图谱获取
                 get().triggerGraphFetch();
             } else {
-                // 如果数据不完整
                 set({ studentProfile: { incomplete: true, status: status } });
             }
         } catch (err) {
@@ -109,7 +102,7 @@ const useAppStore = create((set, get) => ({
         }
     },
 
-    // --- 3. 核心联动：选择学长 ---
+    // --- 3. 核心联动：选择学长 (修复了 ID 匹配 Bug) ---
     selectAlumni: (alumniId) => {
         if (!alumniId) {
             set({ selectedAlumniId: null, selectedJobRole: null, graphData: null });
@@ -117,19 +110,27 @@ const useAppStore = create((set, get) => ({
         }
 
         const { alumniList } = get();
-        // 假设后端 /api/alumni/all 返回的对象中有 jobTitle 字段
-        const alumni = alumniList.find(a => a.id.toString() === alumniId.toString());
 
-        if (alumni && alumni.jobTitle) { // 确保 jobTitle 存在
+        // 【修复点】：优先匹配 alumniId，如果不存在再尝试 id，且增加空值检查
+        const alumni = alumniList.find(a => {
+            const aId = a.alumniId || a.id;
+            return aId && aId.toString() === alumniId.toString();
+        });
+
+        if (alumni) {
             set({
-                selectedAlumniId: alumniId,
-                selectedJobRole: alumni.jobTitle, // 提取岗位名称
-                graphData: null,
+                selectedAlumniId: alumniId, // 确保 ID 被设置
+                selectedJobRole: alumni.jobTitle || null, // 提取岗位名称，如果没有则为 null
+                graphData: null, // 清空旧图谱
             });
-            // 尝试触发图谱
-            get().triggerGraphFetch();
+
+            // 如果有岗位信息，尝试触发图谱更新
+            if (alumni.jobTitle) {
+                get().triggerGraphFetch();
+            }
         } else {
-            console.warn(`未能在学长 (ID: ${alumniId}) 数据中找到 'jobTitle' 字段`);
+            console.warn(`未能在列表里找到 ID 为 ${alumniId} 的校友`);
+            // 即使没找到详细信息，也设置 ID，以便 ChatAssistant 或 Timeline 可以尝试独立加载详情
             set({ selectedAlumniId: alumniId, selectedJobRole: null, graphData: null });
         }
     },
@@ -138,7 +139,8 @@ const useAppStore = create((set, get) => ({
     triggerGraphFetch: async () => {
         const { selectedStudentId, selectedJobRole } = get();
 
-        // 必须同时有学生ID和目标岗位
+        // 只有当“学生”和“目标岗位”都存在时，才请求图谱
+        // 这里的 selectedJobRole 可能来自选中的校友，也可能来自学生自己的意向
         if (selectedStudentId && selectedJobRole) {
             set(state => ({
                 loading: { ...state.loading, graph: true },

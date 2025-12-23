@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import * as d3 from 'd3';
+import useAppStore from '../store/appStore'; // 1. 引入 Store
 
-// --- 样式与常量定义 ---
+// --- 样式与常量定义 (保持不变) ---
 const COLORS = {
     background: 'transparent',
     line: '#00c5c7',
@@ -74,35 +75,36 @@ const styles = {
 
 // --- 组件实现 ---
 const AlumniGrowthTimeline = () => {
+    // 2. 从 Store 获取状态和 Actions
+    const {
+        alumniList,
+        fetchAlumniList,
+        selectAlumni,
+        selectedAlumniId,
+        loading: appLoading
+    } = useAppStore();
+
     const svgRef = useRef(null);
     const containerRef = useRef(null);
-    const [alumniList, setAlumniList] = useState([]);
-    const [selectedAlumniId, setSelectedAlumniId] = useState('');
+
+    // 本地状态仅用于处理时间轴的具体数据加载
     const [timelineData, setTimelineData] = useState(null);
-    const [loading, setLoading] = useState(false);
+    const [timelineLoading, setTimelineLoading] = useState(false);
     const [error, setError] = useState(null);
 
+    // 3. 初始化加载校友列表
     useEffect(() => {
-        const fetchAlumniList = async () => {
-            try {
-                const response = await axios.get('/api/alumni/all');
-                setAlumniList(response.data);
-            } catch (err) {
-                console.error("Failed to fetch alumni list:", err);
-                setError("无法加载校友列表。");
-            }
-        };
         fetchAlumniList();
-    }, []);
+    }, [fetchAlumniList]);
 
+    // 4. 当全局选中的校友ID变化时，加载其时间轴数据
     useEffect(() => {
         const fetchTimelineData = async () => {
             if (!selectedAlumniId) {
                 setTimelineData(null);
-                setLoading(false);
                 return;
             }
-            setLoading(true);
+            setTimelineLoading(true);
             setError(null);
             setTimelineData(null);
             try {
@@ -112,12 +114,13 @@ const AlumniGrowthTimeline = () => {
                 setError(`无法加载校友ID ${selectedAlumniId} 的时间轴数据。`);
                 console.error("Timeline Fetch Error:", err);
             } finally {
-                setLoading(false);
+                setTimelineLoading(false);
             }
         };
         fetchTimelineData();
     }, [selectedAlumniId]);
 
+    // 5. D3 绘图逻辑 (保持不变，依赖 timelineData)
     useEffect(() => {
         if (!timelineData || !containerRef.current || !svgRef.current) {
             d3.select(svgRef.current).selectAll("*").remove();
@@ -127,43 +130,54 @@ const AlumniGrowthTimeline = () => {
         const { width: containerWidth, height: containerHeight } = containerRef.current.getBoundingClientRect();
         const width = containerWidth - MARGIN.left - MARGIN.right;
         const height = containerHeight - MARGIN.top - MARGIN.bottom;
+
         const svg = d3.select(svgRef.current);
         svg.selectAll("*").remove();
+
         const chart = svg.append("g").attr("transform", `translate(${MARGIN.left}, ${MARGIN.top})`);
+
         const parseDate = d3.timeParse("%Y-%m-%d");
         const gpaData = timelineData.gpaSeries.map(d => ({ date: parseDate(d.date), gpa: d.gpa })).filter(d => d.date && d.gpa != null).sort((a, b) => a.date - b.date);
         const durationTenures = timelineData.durationTenures.map(d => ({ ...d, startDate: parseDate(d.startDate), endDate: parseDate(d.endDate) })).filter(d => d.startDate && d.endDate);
         const milestones = timelineData.majorMilestones.map(d => ({ ...d, date: parseDate(d.date) })).filter(d => d.date != null);
+
         const allDates = [...gpaData.map(d => d.date), ...durationTenures.map(d => d.startDate), ...durationTenures.map(d => d.endDate), ...milestones.map(d => d.date)];
         const dateExtent = d3.extent(allDates);
+
         if (!dateExtent[0]) return;
+
         const xDomain = [d3.timeMonth.offset(dateExtent[0], -1), d3.timeMonth.offset(dateExtent[1], 1)];
         const xScale = d3.scaleTime().domain(xDomain).range([0, width]);
         const yScale = d3.scaleLinear().domain([0, 4.0]).range([height, 0]).nice();
+
         const xAxis = d3.axisBottom(xScale).tickFormat(d3.timeFormat("%Y-%m")).tickSize(0).tickPadding(15);
         chart.append("g").attr("transform", `translate(0, ${height})`).call(xAxis).call(g => g.select(".domain").remove()).selectAll("text").style("fill", COLORS.axis);
+
         const yAxis = d3.axisLeft(yScale).tickValues([1.0, 2.0, 3.0, 4.0]).tickFormat(d => d.toFixed(1)).tickSize(-width);
         chart.append("g").call(yAxis).call(g => g.select(".domain").remove()).selectAll(".tick line").attr("stroke", COLORS.axis).attr("stroke-opacity", 0.2);
         chart.selectAll(".tick text").style("fill", COLORS.axis);
+
         chart.selectAll(".tenure-rect").data(durationTenures).enter().append("rect").attr("class", "tenure-rect").attr("x", d => xScale(d.startDate)).attr("y", 0).attr("width", d => Math.max(0, xScale(d.endDate) - xScale(d.startDate))).attr("height", height).style("fill", COLORS.tenure);
+
         if (gpaData.length > 0) {
             const gpaLine = d3.line().x(d => xScale(d.date)).y(d => yScale(d.gpa)).curve(d3.curveStepAfter);
             chart.append("path").datum(gpaData).attr("fill", "none").attr("stroke", COLORS.line).attr("stroke-width", 2.5).attr("d", gpaLine);
         }
+
         const milestoneGroup = chart.selectAll(".milestone-marker").data(milestones).enter().append("g").attr("class", "milestone-marker").attr("transform", d => `translate(${xScale(d.date)}, ${yScale(3.8)})`);
         milestoneGroup.append("path").attr("d", d3.symbol().type(d => SYMBOL_MAP[d.pillar] || d3.symbolCircle).size(120)).style("fill", d => COLORS.milestone[d.pillar] || COLORS.milestone['其他']).style("stroke", COLORS.background).style("stroke-width", 2);
         milestoneGroup.append("title").text(d => `[${d.pillar}] ${d.title}\n日期: ${d3.timeFormat("%Y-%m-%d")(d.date)}`);
     }, [timelineData]);
 
     const renderContent = () => {
-        if (loading) {
-            return <div style={styles.loading}>正在加载校友成长数据...</div>;
+        if (appLoading.alumniList || timelineLoading) {
+            return <div style={styles.loading}>数据加载中...</div>;
         }
         if (error) {
             return <div style={{...styles.loading, color: COLORS.danger}}>{error}</div>;
         }
         if (!selectedAlumniId) {
-            return <div style={styles.loading}>请选择一位校友查看轨迹。</div>;
+            return <div style={styles.loading}>请选择一位校友查看成长轨迹。</div>;
         }
         if (timelineData) {
             return (
@@ -181,13 +195,16 @@ const AlumniGrowthTimeline = () => {
                 <label style={styles.label}>选择校友:</label>
                 <select
                     style={styles.select}
-                    value={selectedAlumniId}
-                    onChange={(e) => setSelectedAlumniId(e.target.value)}
+                    value={selectedAlumniId || ''}
+                    // 6. 触发全局 Action
+                    onChange={(e) => selectAlumni(e.target.value)}
+                    disabled={appLoading.alumniList}
                 >
-                    <option value="" disabled>-- 请选择一位已毕业校友 --</option>
+                    <option value="">-- 请选择一位校友 --</option>
                     {(alumniList || []).map(alumnus => (
-                        <option key={alumnus.alumniId} value={alumnus.alumniId}>
-                            {alumnus.name} ({alumnus.graduationYear}届)
+                        // 注意：这里兼容 id 或 alumniId 字段
+                        <option key={alumnus.alumniId || alumnus.id} value={alumnus.alumniId || alumnus.id}>
+                            {alumnus.name} ({alumnus.graduationYear}届 - {alumnus.jobTitle || '校友'})
                         </option>
                     ))}
                 </select>
