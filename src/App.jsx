@@ -1,20 +1,39 @@
-import React, { useEffect } from 'react';
-import AppRouter from './router/AppRouter';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import Login from './pages/Login';
+import DataDashboard from './components/DataDashboard';
 import useAppStore from './store/appStore';
-import './App.css';
+
+// --- 私有路由封装 ---
+const PrivateRoute = ({ children }) => {
+    const { isAuthenticated } = useAppStore();
+    return isAuthenticated ? children : <Navigate to="/login" replace />;
+};
 
 function App() {
-    // 依然保留全局数据预加载逻辑
-    const fetchStudentList = useAppStore((state) => state.fetchStudentList);
-    const fetchAlumniList = useAppStore((state) => state.fetchAlumniList);
-
-    useEffect(() => {
-        fetchStudentList();
-        fetchAlumniList();
-    }, [fetchStudentList, fetchAlumniList]);
-
     return (
-        <AppRouter />
+        <BrowserRouter>
+            <Routes>
+                {/* 登录页面 */}
+                <Route path="/login" element={<Login />} />
+
+                {/* 核心大屏 (受保护) */}
+                <Route
+                    path="/dashboard"
+                    element={
+                        <PrivateRoute>
+                            <DataDashboard />
+                        </PrivateRoute>
+                    }
+                />
+
+                {/* 根路径默认跳转 */}
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
+                {/* 404 捕获 */}
+                <Route path="*" element={<Navigate to="/login" replace />} />
+            </Routes>
+        </BrowserRouter>
     );
 }
 
