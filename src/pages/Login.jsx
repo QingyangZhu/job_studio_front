@@ -24,9 +24,12 @@ const Login = () => {
             } else if (role === 'STUDENT') {
                 // 如果学生还没做测评，这里可以跳转到测评页
                 // 目前假设都先去 dashboard，由 dashboard 内部处理提示
-                navigate('/dashboard');
-            } else {
-                navigate('/dashboard');
+                if (assessmentCompleted) {
+                    navigate('/dashboard');
+                } else {
+                    // 如果没做测评，跳转到测评页
+                    navigate('/assessment');
+                }
             }
         }
     };

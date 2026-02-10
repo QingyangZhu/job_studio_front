@@ -2,9 +2,10 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import DataDashboard from './components/DataDashboard';
+import AssessmentForm from './pages/AssessmentForm'; // 引入新页面
 import useAppStore from './store/appStore';
 
-// --- 私有路由封装 ---
+// 私有路由
 const PrivateRoute = ({ children }) => {
     const { isAuthenticated } = useAppStore();
     return isAuthenticated ? children : <Navigate to="/login" replace />;
@@ -14,10 +15,9 @@ function App() {
     return (
         <BrowserRouter>
             <Routes>
-                {/* 登录页面 */}
                 <Route path="/login" element={<Login />} />
 
-                {/* 核心大屏 (受保护) */}
+                {/* 核心大屏 */}
                 <Route
                     path="/dashboard"
                     element={
@@ -27,10 +27,17 @@ function App() {
                     }
                 />
 
-                {/* 根路径默认跳转 */}
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                {/* 测评页面 (新增) */}
+                <Route
+                    path="/assessment"
+                    element={
+                        <PrivateRoute>
+                            <AssessmentForm />
+                        </PrivateRoute>
+                    }
+                />
 
-                {/* 404 捕获 */}
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
         </BrowserRouter>
