@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAppStore from '../store/appStore';
+import axios from 'axios'; // 引入 axios
 
 import AssessmentPanel from './AssessmentPanel';
 import ChatAssistant from './ChatAssistant';
@@ -29,7 +30,7 @@ const styles = {
     sideColumn: { flex: 2, display: 'flex', flexDirection: 'column', gap: '20px', height: '100%' },
     centerColumn: { flex: 3, display: 'flex', flexDirection: 'column', gap: '20px', height: '100%' },
 
-    // 面板样式
+    // 面板通用
     sidePanel: { flex: 1, backgroundColor: colors.panelBg, borderRadius: '8px', border: `1px solid ${colors.border}`, padding: '15px', boxShadow: '0 0 10px rgba(0, 197, 199, 0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 },
     centerTopPanel: { flex: 7, backgroundColor: colors.panelBg, borderRadius: '8px', border: `1px solid ${colors.border}`, padding: '15px', boxShadow: '0 0 15px rgba(0, 197, 199, 0.3)', display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 },
     centerBottomPanel: { flex: 4, backgroundColor: colors.panelBg, borderRadius: '8px', border: `1px solid ${colors.border}`, padding: '15px', boxShadow: '0 0 10px rgba(0, 197, 199, 0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 },
@@ -43,7 +44,7 @@ const styles = {
         color: 'rgba(255, 255, 255, 0.6)', transition: 'all 0.3s ease', zIndex: 1001, padding: '5px'
     },
     dropdownMenu: {
-        position: 'absolute', top: '60px', right: '25px', width: '200px',
+        position: 'absolute', top: '60px', right: '25px', width: '220px', // 稍微宽一点以容纳长名字
         backgroundColor: '#0f1025', border: `1px solid ${colors.border}`, borderRadius: '8px',
         boxShadow: '0 5px 20px rgba(0,0,0,0.5)', zIndex: 1000, overflow: 'hidden',
         backdropFilter: 'blur(10px)', animation: 'fadeIn 0.2s ease-out'
@@ -60,6 +61,9 @@ const DataDashboard = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const menuRef = useRef(null);
 
+    // 新增：真实姓名状态
+    const [realName, setRealName] = useState('');
+
     const toggleMenu = (e) => { e.stopPropagation(); setIsMenuOpen(!isMenuOpen); };
 
     const handleNavigation = (path) => {
@@ -74,6 +78,7 @@ const DataDashboard = () => {
         }
     };
 
+    // 监听点击外部关闭菜单
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (menuRef.current && !menuRef.current.contains(event.target)) {
@@ -83,6 +88,24 @@ const DataDashboard = () => {
         if (isMenuOpen) document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isMenuOpen]);
+
+    // === 新增：加载真实姓名 ===
+    useEffect(() => {
+        if (user && user.role === 'STUDENT') {
+            axios.get('/api/users/profile')
+                .then(res => {
+                    if (res.data && res.data.name) {
+                        setRealName(res.data.name);
+                    } else {
+                        setRealName(user.username); // 降级显示用户名
+                    }
+                })
+                .catch(err => {
+                    console.error("无法获取用户姓名", err);
+                    setRealName(user.username);
+                });
+        }
+    }, [user]);
 
     if (!user) return null;
 
@@ -94,6 +117,7 @@ const DataDashboard = () => {
                 onClick={toggleMenu}
                 onMouseEnter={(e) => { e.currentTarget.style.color = colors.accent; e.currentTarget.style.transform = 'rotate(90deg)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = isMenuOpen ? colors.accent : 'rgba(255, 255, 255, 0.6)'; e.currentTarget.style.transform = 'rotate(0deg)'; }}
+                title="设置与账户"
             >
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
             </div>
@@ -102,13 +126,14 @@ const DataDashboard = () => {
             {isMenuOpen && (
                 <div style={styles.dropdownMenu} ref={menuRef} onClick={(e) => e.stopPropagation()}>
                     <div style={styles.menuHeader}>
-                        你好! <span style={styles.menuUserName}>{user.role === 'ADMIN' ? '管理员' : (user.username || '同学')}</span>
+                        你好!
+                        <span style={styles.menuUserName}>
+                            {user.role === 'ADMIN' ? '管理员' : (realName ? `${realName} 同学` : '同学')}
+                        </span>
                     </div>
-                    {/* 管理员 -> 后台管理 */}
                     {user.role === 'ADMIN' && (
                         <button style={styles.menuItem} onClick={() => handleNavigation('/admin')}>🛠 后台管理</button>
                     )}
-                    {/* 学生 -> 个人设置 */}
                     {user.role === 'STUDENT' && (
                         <button style={styles.menuItem} onClick={() => handleNavigation('/profile')}>⚙️ 个人设置</button>
                     )}
